@@ -63,6 +63,10 @@
       background: #d9534f;
       color: #fff;
     }
+    button.backspace {
+      background: #d9534f;
+      color: #fff;
+    }
     button {
       padding: 20px;
       font-size: 18px;
@@ -116,6 +120,8 @@
       <button class="operator" onclick="appendOperator('+')">＋</button>
       <button onclick="sqrt()">√</button>
       <button onclick="percent()">%</button>
+      <button onclick="toggleSign()">+/-</button>
+      <button class="backspace" onclick="backspace()">←</button>
       <button class="clear" onclick="clearEntry()">C</button>
       <button class="clear" onclick="allClear()">AC</button>
       <button class="equal" onclick="calculate()">=</button>
@@ -142,7 +148,7 @@
       const currentNumeric = display.innerText.replace(/,/g, '').replace(/[^\d.]/g, '');
       if (!lastInputWasOperator) {
         if (currentNumeric.includes('.') && currentNumeric.split('.')[1].length >= 8 && value !== '.') return;
-        if (!currentNumeric.includes('.') && currentNumeric.length >= 10) return;
+        if (!currentNumeric.includes('.') && currentNumeric.length >= 11) return;
       }
 
       if (display.innerText === '0' || lastInputWasOperator) {
@@ -179,11 +185,14 @@
         }
 
         const decimalPart = result.toString().split('.')[1] || '';
-        if (Math.abs(result) > 1000000000 || decimalPart.length > 8) {
+        if (Math.abs(result) > 10000000000 || decimalPart.length > 8) {
           display.innerText = result.toExponential(8);
         } else {
           display.innerText = formatWithCommas(parseFloat(result.toFixed(8)).toString());
         }
+
+        display.innerText = formatResult(result);
+
 
         historyDisplay.innerText = currentExpression + ' =';
         addToHistory(currentExpression + ' = ' + display.innerText);
@@ -193,6 +202,33 @@
         currentExpression = '';
       }
     }
+
+   function formatResult(result) {
+     const decimalPart = result.toString().split('.')[1] || '';
+     if (Math.abs(result) >= 10000000000) {
+     return formatWithCommas(result.toFixed(0)); // 小数点以下を切り捨て
+    }
+     if (decimalPart.length > 8) {
+    return formatWithCommas(parseFloat(result.toFixed(8)).toString());
+  }
+  return formatWithCommas(result.toString());
+}
+
+    function backspace() {
+ 　　 if (display.innerText.length > 1) {
+   　 display.innerText = display.innerText.slice(0, -1);
+  　} else {
+    display.innerText = '0';
+     }
+   }
+
+　　function toggleSign() {
+  　　const currentVal = parseFloat(display.innerText.replace(/,/g, ''));
+  　　if (!isNaN(currentVal)) {
+    　display.innerText = formatWithCommas((-currentVal).toString());
+  　　}
+　　}
+
 
     function clearEntry() {
       display.innerText = '0';
@@ -226,15 +262,6 @@
       const result = Math.sqrt(val);
       display.innerText = formatResult(result);
       historyDisplay.innerText = `√(${val})`;
-    }
-
-    function formatResult(result) {
-      const decimalPart = result.toString().split('.')[1] || '';
-      if (Math.abs(result) > 1000000000 || decimalPart.length > 8) {
-        return result.toExponential(8);
-      } else {
-        return formatWithCommas(parseFloat(result.toFixed(8)).toString());
-      }
     }
 
     function formatWithCommas(value) {
