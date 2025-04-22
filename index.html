@@ -1,7 +1,9 @@
-<!DOCTYPE html><html lang="ja">
+<!DOCTYPE html>
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
   <title>電卓</title>
+  <script src="https://cdn.jsdelivr.net/npm/big.js@6.2.1/big.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -46,8 +48,10 @@
     button {
       padding: 20px;
       font-size: 18px;
-      border: none;
-      border-radius: 5px;
+      border: solid 1px #dcdcdca4;
+      border-right: solid 4px #dcdcdca4;
+      border-bottom: solid 4px #dcdcdca4;
+      border-radius: 10px;
       cursor: pointer;
     }
     button.operator {
@@ -59,31 +63,10 @@
       color: #fff;
       grid-column: span 2;
     }
-    button.clear {
+    button.clear, button.backspace {
       background: #d9534f;
       color: #fff;
     }
-    button.backspace {
-      background: #d9534f;
-      color: #fff;
-    }
-    button {
-      padding: 20px;
-      font-size: 18px;
-      border: solid 1px #dcdcdca4;
-      border-right: solid 4px #dcdcdca4;
-      border-bottom: solid 4px #dcdcdca4;
-      border-radius: 10px;
-      cursor: pointer;
-    }
-    button.operator {
-      background: #f0ad4e;
-      color: #fff;
-    }
-    button.operator:hover {
-      background: #339cdd;
-    }
-
     .history {
       margin-top: 20px;
       width: 320px;
@@ -126,109 +109,90 @@
       <button class="clear" onclick="allClear()">AC</button>
       <button class="equal" onclick="calculate()">=</button>
     </div>
-  </div>  <div class="history" id="history">
+  </div>
+  <div class="history" id="history">
     <h3>計算履歴</h3>
     <div id="historyList"></div>
-  </div>  <script>
+  </div>
+  <script>
     const display = document.getElementById("display");
     const historyDisplay = document.getElementById("historyDisplay");
     const historyList = document.getElementById("historyList");
 
-    let currentExpression = "";
-    let lastInputWasOperator = false;
-    let lastValue = null;
-    let lastOperator = null;
-    let repeatExpression = "";
+    let lastInputWasEquals = false;
 
     function append(value) {
-      if (display.innerText === '桁数オーバー' || display.innerText === 'エラー') return;
-
-      if (value === '.' && display.innerText.includes('.')) return;
-
-      const currentNumeric = display.innerText.replace(/,/g, '').replace(/[^\d.]/g, '');
-      if (!lastInputWasOperator) {
-        if (currentNumeric.includes('.') && currentNumeric.split('.')[1].length >= 8 && value !== '.') return;
-        if (!currentNumeric.includes('.') && currentNumeric.length >= 11) return;
+      if (display.innerText === 'エラー') return;
+      if (lastInputWasEquals) {
+        display.innerText = isOperator(value) ? display.innerText + value : value;
+        lastInputWasEquals = false;
+        return;
       }
-
-      if (display.innerText === '0' || lastInputWasOperator) {
+      const current = display.innerText;
+      const lastChar = current.slice(-1);
+      if (isOperator(lastChar) && isOperator(value) && value !== '-') return;
+      const tokens = current.split(/[-+*/]/);
+      const lastToken = tokens[tokens.length - 1];
+      if (value === '.' && lastToken.includes('.')) return;
+      if (current === '0' && value !== '.') {
         display.innerText = value;
+      } else if (current === '0' && value === '.') {
+        display.innerText = '0.';
       } else {
         display.innerText += value;
       }
-
-      display.innerText = formatWithCommas(display.innerText.replace(/,/g, ''));
-      lastInputWasOperator = false;
     }
 
     function appendOperator(op) {
-      const currentVal = display.innerText.replace(/,/g, '');
-      currentExpression = `${currentVal} ${op} `;
-      historyDisplay.innerText = currentExpression;
-      lastInputWasOperator = true;
-      lastValue = currentVal;
-      lastOperator = op;
+      const current = display.innerText;
+      if (isOperator(current.slice(-1)) && op !== '-') return;
+      display.innerText += op;
     }
 
     function calculate() {
       try {
-        let result;
-        if (!lastInputWasOperator) {
-          const currentVal = display.innerText.replace(/,/g, '');
-          currentExpression += currentVal;
-          result = eval(currentExpression);
-          repeatExpression = `${lastOperator} ${currentVal}`;
-        } else {
-          const currentVal = display.innerText.replace(/,/g, '');
-          result = eval(`${currentVal} ${repeatExpression}`);
-          currentExpression = `${currentVal} ${repeatExpression}`;
+        const expr = display.innerText;
+        const tokens = expr.match(/(-?\d+(\.\d+)?|[+\-*/])/g);
+        if (!tokens) throw new Error();
+
+        let result = new Big(tokens[0]);
+        for (let i = 1; i < tokens.length; i += 2) {
+          const operator = tokens[i];
+          const nextNumber = new Big(tokens[i + 1]);
+          switch (operator) {
+            case '+': result = result.plus(nextNumber); break;
+            case '-': result = result.minus(nextNumber); break;
+            case '*': result = result.times(nextNumber); break;
+            case '/': result = result.div(nextNumber); break;
+          }
         }
 
-        const decimalPart = result.toString().split('.')[1] || '';
-        if (Math.abs(result) > 10000000000 || decimalPart.length > 8) {
-          display.innerText = result.toExponential(8);
-        } else {
-          display.innerText = formatWithCommas(parseFloat(result.toFixed(8)).toString());
-        }
-
-        display.innerText = formatResult(result);
-
-
-        historyDisplay.innerText = currentExpression + ' =';
-        addToHistory(currentExpression + ' = ' + display.innerText);
-        lastInputWasOperator = true;
+        const resultStr = result.toFixed(8).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+        display.innerText = resultStr;
+        historyDisplay.innerText = expr + ' =';
+        addToHistory(expr + ' = ' + resultStr);
+        lastInputWasEquals = true;
       } catch {
         display.innerText = 'エラー';
-        currentExpression = '';
       }
     }
 
-   function formatResult(result) {
-     const decimalPart = result.toString().split('.')[1] || '';
-     if (Math.abs(result) >= 10000000000) {
-     return formatWithCommas(result.toFixed(0)); // 小数点以下を切り捨て
-    }
-     if (decimalPart.length > 8) {
-    return formatWithCommas(parseFloat(result.toFixed(8)).toString());
-  }
-  return formatWithCommas(result.toString());
-}
-
     function backspace() {
- 　　 if (display.innerText.length > 1) {
-   　 display.innerText = display.innerText.slice(0, -1);
-  　} else {
-    display.innerText = '0';
-     }
-   }
+      let raw = display.innerText;
+      display.innerText = raw.length > 1 ? raw.slice(0, -1) : '0';
+    }
 
-　　function toggleSign() {
-  　　const currentVal = parseFloat(display.innerText.replace(/,/g, ''));
-  　　if (!isNaN(currentVal)) {
-    　display.innerText = formatWithCommas((-currentVal).toString());
-  　　}
-　　}
-
+    function toggleSign() {
+      const current = display.innerText;
+      const match = current.match(/(-?\d+(\.\d+)?)(?!.*\d)/);
+      if (match) {
+        const number = match[0];
+        const index = match.index;
+        const newNumber = number.startsWith('-') ? number.slice(1) : '-' + number;
+        const updated = current.slice(0, index) + newNumber + current.slice(index + number.length);
+        display.innerText = updated;
+      }
+    }
 
     function clearEntry() {
       display.innerText = '0';
@@ -237,38 +201,28 @@
     function allClear() {
       display.innerText = '0';
       historyDisplay.innerText = '';
-      currentExpression = '';
-      lastValue = null;
-      lastOperator = null;
-      repeatExpression = '';
+      lastInputWasEquals = false;
     }
 
     function percent() {
-      const val = parseFloat(display.innerText.replace(/,/g, ''));
-      const result = val / 100;
-      display.innerText = formatResult(result);
+      const val = new Big(display.innerText);
+      const result = val.div(100);
+      display.innerText = result.toString();
       historyDisplay.innerText = `${val} × 0.01`;
     }
 
     function square() {
-      const val = parseFloat(display.innerText.replace(/,/g, ''));
-      const result = val * val;
-      display.innerText = formatResult(result);
+      const val = new Big(display.innerText);
+      const result = val.times(val);
+      display.innerText = result.toString();
       historyDisplay.innerText = `sqr(${val})`;
     }
 
     function sqrt() {
-      const val = parseFloat(display.innerText.replace(/,/g, ''));
-      const result = Math.sqrt(val);
-      display.innerText = formatResult(result);
+      const val = new Big(display.innerText);
+      const result = val.sqrt();
+      display.innerText = result.toString();
       historyDisplay.innerText = `√(${val})`;
-    }
-
-    function formatWithCommas(value) {
-      if (!value || isNaN(value)) return value;
-      const parts = value.split(".");
-      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-      return parts.join(".");
     }
 
     function addToHistory(text) {
@@ -276,5 +230,10 @@
       div.textContent = text;
       historyList.prepend(div);
     }
-  </script></body>
+
+    function isOperator(char) {
+      return ['+', '-', '*', '/'].includes(char);
+    }
+  </script>
+</body>
 </html>
