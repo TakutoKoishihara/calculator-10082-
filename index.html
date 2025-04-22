@@ -152,18 +152,33 @@
     function calculate() {
       try {
         const expr = display.innerText;
-        const tokens = expr.match(/(-?\d+(\.\d+)?|[+\-*/])/g);
-        if (!tokens) throw new Error();
+        const tokens = [];
+        let numberBuffer = '';
+        for (let i = 0; i < expr.length; i++) {
+          const char = expr[i];
+          if (char === '-' && (i === 0 || isOperator(expr[i - 1]))) {
+            numberBuffer += char; // マイナス記号を数字に含める
+          } else if (isOperator(char)) {
+            if (numberBuffer === '') throw new Error();
+            tokens.push(numberBuffer);
+            tokens.push(char);
+            numberBuffer = '';
+          } else {
+            numberBuffer += char;
+          }
+        }
+        if (numberBuffer !== '') tokens.push(numberBuffer);
 
         let result = new Big(tokens[0]);
         for (let i = 1; i < tokens.length; i += 2) {
           const operator = tokens[i];
-          const nextNumber = new Big(tokens[i + 1]);
+          const next = new Big(tokens[i + 1]);
           switch (operator) {
-            case '+': result = result.plus(nextNumber); break;
-            case '-': result = result.minus(nextNumber); break;
-            case '*': result = result.times(nextNumber); break;
-            case '/': result = result.div(nextNumber); break;
+            case '+': result = result.plus(next); break;
+            case '-': result = result.minus(next); break;
+            case '*': result = result.times(next); break;
+            case '/': result = result.div(next); break;
+            default: throw new Error();
           }
         }
 
